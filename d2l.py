@@ -27,4 +27,4 @@ from torch import nn
 from torch.nn import functional as F
 from torchvision import transforms
 
-d2l = sys.modules[__name__]
+d2l = sys.modules[__name__] ##@save ## To be able to use d2l.xxx in the d2l package
