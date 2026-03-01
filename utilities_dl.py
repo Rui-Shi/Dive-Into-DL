@@ -1,3 +1,4 @@
+from random import random
 import time
 import numpy as np
 import torch
@@ -140,3 +141,81 @@ class Trainer(d2l.HyperParameters): #@save
     def fit_epoch(self):
         """Placeholder for inner loop batch processing."""
         raise NotImplementedError
+
+
+# Inherits from the DataModule class to standardize how data is fed to the Trainer
+class SyntheticRegressionData(d2l.DataModule): #@save
+    """Synthetic data for linear regression."""
+    def __init__(self, w, b, noise=0.01, num_train=1000, num_val=1000, batch_size=32):
+        super().__init__()
+        # Automatically saves w, b, noise, num_train, etc., to self
+        self.save_hyperparameters()
+        
+        # Total number of data points needed (train + validation)
+        n = num_train + num_val
+        
+        # 1. Generate the Features (X)
+        # Creates a matrix of size (n, length of w) filled with random numbers 
+        # from a standard normal distribution (mean=0, variance=1)
+        self.X = torch.randn(n, len(w))
+        
+        # 2. Generate the Noise
+        # Creates a column vector of random noise, scaled by the 'noise' parameter
+        noise_tensor = torch.randn(n, 1) * noise
+        
+        # 3. Generate the Labels (y)
+        # Performs matrix multiplication: X * w + b + noise
+        # w.reshape((-1, 1)) ensures w is treated as a column vector
+        self.y = torch.matmul(self.X, w.reshape((-1, 1))) + b + noise_tensor
+
+
+# Injects this method into the SyntheticRegressionData class defined earlier
+@d2l.add_to_class(SyntheticRegressionData)
+def get_dataloader(self, train):
+    # 1. Determine which subset of data to use
+    if train:
+        # Create a list of indices for the training data (e.g., 0 to 999)
+        indices = list(range(0, self.num_train))
+        # Randomly shuffle the training indices. 
+        # This is crucial for Stochastic Gradient Descent (SGD) to work properly!
+        random.shuffle(indices)
+    else:
+        # Create a list of indices for the validation data (e.g., 1000 to 1999)
+        # We don't need to shuffle validation data because we are just evaluating it.
+        indices = list(range(self.num_train, self.num_train + self.num_val))
+        
+    # 2. Group the indices into batches
+    # Iterate from 0 to the end of the data, stepping by 'batch_size' (e.g., 32)
+    for i in range(0, len(indices), self.batch_size):
+        # Grab the next 32 indices and convert them to a PyTorch tensor
+        batch_indices = torch.tensor(indices[i: i+self.batch_size])
+        
+        # 3. Yield the actual data points
+        # Return the corresponding slice of Features (X) and Labels (y)
+        yield self.X[batch_indices], self.y[batch_indices]
+
+
+@d2l.add_to_class(d2l.DataModule)  #@save
+def get_tensorloader(self, tensors, train, indices=slice(0, None)):
+    # 1. Slicing: Subsets the data (X and y) based on the provided indices
+    tensors = tuple(a[indices] for a in tensors)
+    
+    # 2. Wrapping: Pairs the corresponding X and y rows together
+    dataset = torch.utils.data.TensorDataset(*tensors)
+    
+    # 3. Loading: Creates the PyTorch DataLoader 
+    return torch.utils.data.DataLoader(dataset, self.batch_size,
+                                       shuffle=train)
+
+
+@d2l.add_to_class(d2l.DataModule)  #@save
+def get_tensorloader(self, tensors, train, indices=slice(0, None)):
+    # 1. Slicing: Subsets the data (X and y) based on the provided indices
+    tensors = tuple(a[indices] for a in tensors)
+    
+    # 2. Wrapping: Pairs the corresponding X and y rows together
+    dataset = torch.utils.data.TensorDataset(*tensors)
+    
+    # 3. Loading: Creates the PyTorch DataLoader 
+    return torch.utils.data.DataLoader(dataset, self.batch_size,
+                                       shuffle=train)
